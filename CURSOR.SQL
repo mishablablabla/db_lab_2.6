@@ -330,6 +330,79 @@ ORDER BY rn;
 
 
 -- ====================================================
+-- Завдання 10. Використання курсору для зведеної таблиці з результатом запиту (7)
+-- ====================================================
+
+DECLARE @StartTime datetime2 = SYSDATETIME();
+IF OBJECT_ID('tempdb..#SummarySchedule') IS NOT NULL DROP TABLE #SummarySchedule;
+
+CREATE TABLE #SummarySchedule (
+    day_of_week varchar(15),
+    pair_number int,
+    teacher varchar(100),
+    group_number varchar(50),
+    subject varchar(100),
+    room_number varchar(10),
+    building varchar(50),
+    row_order int
+);
+
+DECLARE 
+    @id int,
+    @day_of_week varchar(15),
+    @pair_number int,
+    @teacher varchar(100),
+    @group_number varchar(50),
+    @subject varchar(100),
+    @room_number varchar(10),
+    @building varchar(50),
+    @row_order int = 1;
+
+DECLARE schedule_cursor CURSOR FOR
+SELECT 
+    s.id,
+    s.day_of_week,
+    s.pair_number,
+    t.full_name,
+    g.group_number,
+    sub.name,
+    a.room_number,
+    a.building
+FROM master.dbo.Schedule s
+JOIN master.dbo.Teachers t ON s.teacher_id = t.id
+JOIN master.dbo.Groups g ON s.group_id = g.id
+JOIN master.dbo.Subjects sub ON s.subject_id = sub.id
+JOIN master.dbo.Auditoriums a ON s.auditorium_id = a.id
+WHERE s.day_of_week = 'Monday'
+ORDER BY s.pair_number, t.full_name;
+OPEN schedule_cursor;
+FETCH NEXT FROM schedule_cursor INTO @id, @day_of_week, @pair_number, @teacher, @group_number, @subject, @room_number, @building;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    INSERT INTO #SummarySchedule(day_of_week, pair_number, teacher, group_number, subject, room_number, building, row_order)
+    VALUES (@day_of_week, @pair_number, @teacher, @group_number, @subject, @room_number, @building, @row_order);
+
+    SET @row_order += 1;
+    FETCH NEXT FROM schedule_cursor INTO @id, @day_of_week, @pair_number, @teacher, @group_number, @subject, @room_number, @building;
+END
+
+CLOSE schedule_cursor;
+DEALLOCATE schedule_cursor;
+DECLARE @teacherCount int;
+SELECT @teacherCount = COUNT(*) FROM master.dbo.Teachers;
+INSERT INTO #SummarySchedule(day_of_week, pair_number, teacher, group_number, subject, room_number, building, row_order)
+VALUES (NULL, NULL, CONCAT('Total Teachers: ', @teacherCount), NULL, NULL, NULL, NULL, 3);
+
+SELECT day_of_week, pair_number, teacher, group_number, subject, room_number, building
+FROM #SummarySchedule
+ORDER BY row_order;
+
+DECLARE @EndTime datetime2 = SYSDATETIME();
+PRINT 'Execution time (ms): ' + CONVERT(varchar, DATEDIFF(ms, @StartTime, @EndTime));
+
+
+-- ====================================================
 -- Завдання 11. 
 -- ====================================================
 
